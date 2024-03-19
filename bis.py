@@ -34,7 +34,7 @@ class BIS:
     _content_document: list[SPP_document]
 
 
-    def __init__(self, webdriver, *args, **kwargs):
+    def __init__(self, webdriver, max_count_documents: int = None, last_document: SPP_document = None, *args, **kwargs):
         """
         Конструктор класса парсера
 
@@ -45,7 +45,9 @@ class BIS:
         self._content_document = []
 
         # Webdriver Selenium для парсера
-        self.driver = webdriver
+        self._driver = webdriver
+        self._max_count_documents = max_count_documents
+        self._last_document = last_document
 
         # Логер должен подключаться так. Вся настройка лежит на платформе
         self.logger = logging.getLogger(self.__class__.__name__)
@@ -60,9 +62,14 @@ class BIS:
         :rtype:
         """
         self.logger.debug("Parse process start")
-        self._parse()
-        self.logger.debug("Parse process finished")
+        try:
+            self._parse()
+        except Exception as e:
+            self.logger.debug(f'Parsing stopped with error: {e}')
+        else:
+            self.logger.debug("Parse process finished")
         return self._content_document
+
 
     def _parse(self):
         """
@@ -85,10 +92,10 @@ class BIS:
             if page_number >= 4: break
 
             self.logger.info(f'Загрузка страницы: {self.url_template}{page_number}')
-            self.driver.get(url=f"{self.url_template}{page_number}")
+            self._driver.get(url=f"{self.url_template}{page_number}")
             req = requests.get(f"{self.url_template}{page_number}")
             time.sleep(5)
-            page = self.driver.page_source
+            page = self._driver.page_source
             if req.status_code == 200:
                 checker = self._parse_page(page)
             else:
@@ -174,7 +181,9 @@ class BIS:
 
                         else:
                             self.logger.debug(f'Для {self.HOST}{source} не получилось найти ссылку на документ')
-
+                except:
+                    self.logger.error(f'Ошибка парсинга')
+                else:
                     document = SPP_document(
                         None,
                         title=title,
@@ -188,10 +197,7 @@ class BIS:
                     )
                     if autor:
                         document.other_data = {'author': autor}
-                    self._content_document.append(document)
-                    self.logger.debug(self._find_document_text_for_logger(document))
-                except:
-                    self.logger.error(f'Ошибка парсинга')
+                    self.find_document(document)
             else:
                 return False
 
@@ -208,17 +214,6 @@ class BIS:
         """
         return f"Find document | name: {doc.title} | link to web: {doc.web_link} | publication date: {doc.pub_date}"
 
-    @staticmethod
-    def some_necessary_method():
-        """
-        Если для парсинга нужен какой-то метод, то его нужно писать в классе.
-
-        Например: конвертация дат и времени, конвертация версий документов и т. д.
-        :return:
-        :rtype:
-        """
-        ...
-
     def get_text_from_div(self, div):
         text = ""
         for element in div.contents:
@@ -230,41 +225,15 @@ class BIS:
                 text += element.get_text() + " "
         return text
 
-    @staticmethod
-    def nasty_download(driver, path: str, url: str) -> str:
+    def find_document(self, _doc: SPP_document):
         """
-        Метод для "противных" источников. Для разных источника он может отличаться.
-        Но основной его задачей является:
-            доведение driver селениума до файла непосредственно.
-
-            Например: пройти куки, ввод форм и т. п.
-
-        Метод скачивает документ по пути, указанному в driver, и возвращает имя файла, который был сохранен
-        :param driver: WebInstallDriver, должен быть с настроенным местом скачивания
-        :_type driver: WebInstallDriver
-        :param url:
-        :_type url:
-        :return:
-        :rtype:
+        Метод для обработки найденного документа источника
         """
+        if self._last_document and self._last_document.hash == _doc.hash:
+            raise Exception(f"Find already existing document ({self._last_document})")
 
-        with driver:
-            driver.set_page_load_timeout(40)
-            driver.get(url=url)
-            time.sleep(1)
+        if self._max_count_documents and len(self._content_document) >= self._max_count_documents:
+            raise Exception(f"Max count articles reached ({self._max_count_documents})")
 
-            # ========================================
-            # Тут должен находится блок кода, отвечающий за конкретный источник
-            # -
-            # ---
-            # ========================================
-
-            # Ожидание полной загрузки файла
-            while not os.path.exists(path + '/' + url.split('/')[-1]):
-                time.sleep(1)
-
-            if os.path.isfile(path + '/' + url.split('/')[-1]):
-                # filename
-                return url.split('/')[-1]
-            else:
-                return ""
+        self._content_document.append(_doc)
+        self.logger.info(self._find_document_text_for_logger(_doc))
