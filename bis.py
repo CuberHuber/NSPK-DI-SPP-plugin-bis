@@ -33,7 +33,6 @@ class BIS:
 
     _content_document: list[SPP_document]
 
-
     def __init__(self, webdriver, max_count_documents: int = None, last_document: SPP_document = None, *args, **kwargs):
         """
         Конструктор класса парсера
@@ -70,7 +69,6 @@ class BIS:
             self.logger.debug("Parse process finished")
         return self._content_document
 
-
     def _parse(self):
         """
         Метод, занимающийся парсингом. Он добавляет в _content_document документы, которые получилось обработать
@@ -85,7 +83,6 @@ class BIS:
         # -
         checker = True
         page_number = 0
-
 
         while checker:
             page_number = page_number + 1
@@ -138,7 +135,7 @@ class BIS:
             date_info = link.find('td', class_="item_date").get_text(strip=True)
             official_date = datetime.strptime(date_info, '%d %b %Y')
             if official_date > self.date_begin:
-                web_link: str = self.HOST+source
+                web_link: str = self.HOST + source
                 try:
                     if ".pdf" not in source:
                         doc_page = requests.get(web_link)
@@ -146,8 +143,9 @@ class BIS:
                         interval_source = new_soup.find('a', class_="pdftitle_link")
                         div_autor = new_soup.find("div", class_="authorline")
                         if div_autor:
-                            autor = (self.get_text_from_div(div_autor)).replace('\n', ' ').replace('\t', ' ').replace("¶",
-                                                                                                                      " ").replace(
+                            autor = (self.get_text_from_div(div_autor)).replace('\n', ' ').replace('\t', ' ').replace(
+                                "¶",
+                                " ").replace(
                                 "▲",
                                 " ").replace(
                                 '\xa0', ' ').replace('\r', ' ').replace('—', "-").replace("’", "'").replace("“",
